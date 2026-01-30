@@ -3,20 +3,20 @@
 import { useState, useCallback } from "react";
 import useSWR, { mutate } from "swr";
 import { Activity, ActivityTypeConfig, availableColors } from "@/lib/types";
-import { CalendarHeader } from "./calendar-header";
-import { CalendarGrid } from "./calendar-grid";
-import { ActivityStats } from "./activity-stats";
+import { WeeklyHeader } from "./weekly-header";
+import { WeeklyGrid } from "./weekly-grid";
+import { WeeklyStats } from "./weekly-stats";
 import { AddActivityDialog } from "./add-activity-dialog";
 import { ManageTypesDialog } from "./manage-types-dialog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Settings2, Loader2, Calendar, CalendarDays, CalendarRange } from "lucide-react"
+import { Settings2, Loader2, Calendar, CalendarDays, CalendarRange } from "lucide-react";
 
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 type ViewMode = "monthly" | "weekly" | "daily"
 
-interface MonthlyCalendarProps {
+interface WeeklyCalendarProps {
 	viewMode: ViewMode;
 	setViewMode: (mode: ViewMode) => void;
 }
@@ -32,30 +32,66 @@ function getTypeWithColors(type: { id: string; name: string; color: string }): A
 	};
 }
 
-export function MonthlyCalendar({ viewMode, setViewMode }: MonthlyCalendarProps) {
+// Get start of week (Monday)
+function getStartOfWeek(date: Date): Date {
+	const d = new Date(date);
+	const day = d.getDay();
+	const diff = day === 0 ? -6 : 1 - day; // Adjust to Monday
+	d.setDate(d.getDate() + diff);
+	d.setHours(0, 0, 0, 0);
+	return d;
+}
+
+// Get end of week (Sunday)
+function getEndOfWeek(date: Date): Date {
+	const d = new Date(date);
+	const day = d.getDay();
+	const diff = day === 0 ? 0 : 7 - day; // Adjust to Sunday
+	d.setDate(d.getDate() + diff);
+	d.setHours(23, 59, 59, 999);
+	return d;
+}
+
+export function WeeklyCalendar({ viewMode, setViewMode }: WeeklyCalendarProps) {
 	const [currentDate, setCurrentDate] = useState(new Date());
 	const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const [typesDialogOpen, setTypesDialogOpen] = useState(false);
 
-	const month = currentDate.getMonth();
-	const year = currentDate.getFullYear();
+	const startOfWeek = getStartOfWeek(currentDate);
+	const endOfWeek = getEndOfWeek(currentDate);
 
 	// Fetch activity types
 	const { data: rawTypes, isLoading: typesLoading } = useSWR<{ id: string; name: string; color: string }[]>("/api/activity-types", fetcher);
 
-	// Fetch activities for current month
-	const { data: activities, isLoading: activitiesLoading } = useSWR<Activity[]>(`/api/activities?month=${month}&year=${year}`, fetcher);
+	// Fetch activities for current week
+	const month = currentDate.getMonth();
+	const year = currentDate.getFullYear();
+	const { data: allActivities, isLoading: activitiesLoading } = useSWR<Activity[]>(`/api/activities?month=${month}&year=${year}`, fetcher);
 
 	const activityTypes = rawTypes?.map(getTypeWithColors) || [];
 	const isLoading = typesLoading || activitiesLoading;
 
-	const handlePrevMonth = useCallback(() => {
-		setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+	// Filter activities for current week
+	const weekActivities = (allActivities || []).filter((activity) => {
+		const activityDate = new Date(activity.date);
+		return activityDate >= startOfWeek && activityDate <= endOfWeek;
+	});
+
+	const handlePrevWeek = useCallback(() => {
+		setCurrentDate((prev) => {
+			const d = new Date(prev);
+			d.setDate(d.getDate() - 7);
+			return d;
+		});
 	}, []);
 
-	const handleNextMonth = useCallback(() => {
-		setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+	const handleNextWeek = useCallback(() => {
+		setCurrentDate((prev) => {
+			const d = new Date(prev);
+			d.setDate(d.getDate() + 7);
+			return d;
+		});
 	}, []);
 
 	const handleToday = useCallback(() => {
@@ -97,14 +133,11 @@ export function MonthlyCalendar({ viewMode, setViewMode }: MonthlyCalendarProps)
 
 	const handleUpdateTypes = useCallback(
 		async (newTypes: ActivityTypeConfig[]) => {
-			// This will be handled by the dialog directly via API calls
 			mutate("/api/activity-types");
 			mutate(`/api/activities?month=${month}&year=${year}`);
 		},
 		[month, year],
 	);
-
-	const monthActivities = activities || [];
 
 	return (
 		<div className="min-h-screen bg-background p-6">
@@ -113,7 +146,7 @@ export function MonthlyCalendar({ viewMode, setViewMode }: MonthlyCalendarProps)
 				<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 					<div>
 						<h1 className="text-2xl font-bold text-foreground">Calendario Attività</h1>
-						<p className="text-sm text-muted-foreground">Gestisci e monitora le tue attività mensili</p>
+						<p className="text-sm text-muted-foreground">Gestisci e monitora le tue attività settimanali</p>
 					</div>
 					{/* Activity Type Legend with Settings */}
 					<div className="flex flex-wrap items-center gap-3">
@@ -160,10 +193,17 @@ export function MonthlyCalendar({ viewMode, setViewMode }: MonthlyCalendarProps)
 					<div className="grid gap-6 lg:grid-cols-[1fr_280px]">
 						{/* Calendar Section */}
 						<div className="space-y-4">
-							<CalendarHeader currentDate={currentDate} onPrevMonth={handlePrevMonth} onNextMonth={handleNextMonth} onToday={handleToday} />
-							<CalendarGrid
+							<WeeklyHeader
 								currentDate={currentDate}
-								activities={monthActivities}
+								startOfWeek={startOfWeek}
+								endOfWeek={endOfWeek}
+								onPrevWeek={handlePrevWeek}
+								onNextWeek={handleNextWeek}
+								onToday={handleToday}
+							/>
+							<WeeklyGrid
+								startOfWeek={startOfWeek}
+								activities={weekActivities}
 								activityTypes={activityTypes}
 								onDateClick={handleDateClick}
 								onRemoveActivity={handleRemoveActivity}
@@ -172,7 +212,7 @@ export function MonthlyCalendar({ viewMode, setViewMode }: MonthlyCalendarProps)
 
 						{/* Sidebar with Stats */}
 						<div className="space-y-4">
-							<ActivityStats activities={monthActivities} activityTypes={activityTypes} />
+							<WeeklyStats activities={weekActivities} activityTypes={activityTypes} startOfWeek={startOfWeek} endOfWeek={endOfWeek} />
 
 							{/* Quick Tips */}
 							<div className="rounded-lg border border-border bg-card p-4">
