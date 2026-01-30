@@ -1,0 +1,187 @@
+"use client"
+
+import { useState, useCallback } from "react"
+import useSWR, { mutate } from "swr"
+import { Activity, ActivityTypeConfig, availableColors } from "@/lib/types"
+import { CalendarHeader } from "./calendar-header"
+import { CalendarGrid } from "./calendar-grid"
+import { ActivityStats } from "./activity-stats"
+import { AddActivityDialog } from "./add-activity-dialog"
+import { ManageTypesDialog } from "./manage-types-dialog"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Settings2, Loader2 } from "lucide-react"
+
+const fetcher = (url: string) => fetch(url).then(res => res.json())
+
+// Convert DB color to Tailwind classes
+function getTypeWithColors(type: { id: string; name: string; color: string }): ActivityTypeConfig {
+  const colorConfig = availableColors.find(c => c.name.toLowerCase() === type.color.toLowerCase())
+  return {
+    id: type.id,
+    label: type.name,
+    color: colorConfig?.color || "text-chart-1",
+    bgColor: colorConfig?.bgColor || "bg-chart-1",
+  }
+}
+
+export function MonthlyCalendar() {
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [typesDialogOpen, setTypesDialogOpen] = useState(false)
+
+  const month = currentDate.getMonth()
+  const year = currentDate.getFullYear()
+
+  // Fetch activity types
+  const { data: rawTypes, isLoading: typesLoading } = useSWR<{ id: string; name: string; color: string }[]>(
+    "/api/activity-types",
+    fetcher
+  )
+
+  // Fetch activities for current month
+  const { data: activities, isLoading: activitiesLoading } = useSWR<Activity[]>(
+    `/api/activities?month=${month}&year=${year}`,
+    fetcher
+  )
+
+  const activityTypes = rawTypes?.map(getTypeWithColors) || []
+  const isLoading = typesLoading || activitiesLoading
+
+  const handlePrevMonth = useCallback(() => {
+    setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+  }, [])
+
+  const handleNextMonth = useCallback(() => {
+    setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+  }, [])
+
+  const handleToday = useCallback(() => {
+    setCurrentDate(new Date())
+  }, [])
+
+  const handleDateClick = useCallback((date: Date) => {
+    setSelectedDate(date)
+    setDialogOpen(true)
+  }, [])
+
+  const handleAddActivity = useCallback(async (activityData: Omit<Activity, "id">) => {
+    try {
+      await fetch("/api/activities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(activityData),
+      })
+      mutate(`/api/activities?month=${month}&year=${year}`)
+    } catch (error) {
+      console.error("Error adding activity:", error)
+    }
+  }, [month, year])
+
+  const handleRemoveActivity = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/activities/${id}`, { method: "DELETE" })
+      mutate(`/api/activities?month=${month}&year=${year}`)
+    } catch (error) {
+      console.error("Error removing activity:", error)
+    }
+  }, [month, year])
+
+  const handleUpdateTypes = useCallback(async (newTypes: ActivityTypeConfig[]) => {
+    // This will be handled by the dialog directly via API calls
+    mutate("/api/activity-types")
+    mutate(`/api/activities?month=${month}&year=${year}`)
+  }, [month, year])
+
+  const monthActivities = activities || []
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Calendario Attività</h1>
+            <p className="text-sm text-muted-foreground">
+              Gestisci e monitora le tue attività mensili
+            </p>
+          </div>
+          {/* Activity Type Legend with Settings */}
+          <div className="flex flex-wrap items-center gap-3">
+            {activityTypes.map((type) => (
+              <div key={type.id} className="flex items-center gap-1.5">
+                <span className={cn("h-2.5 w-2.5 rounded-full", type.bgColor)} />
+                <span className="text-xs text-muted-foreground">{type.label}</span>
+              </div>
+            ))}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+              onClick={() => setTypesDialogOpen(true)}
+            >
+              <Settings2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Gestisci</span>
+            </Button>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            {/* Calendar Section */}
+            <div className="space-y-4">
+              <CalendarHeader
+                currentDate={currentDate}
+                onPrevMonth={handlePrevMonth}
+                onNextMonth={handleNextMonth}
+                onToday={handleToday}
+              />
+              <CalendarGrid
+                currentDate={currentDate}
+                activities={monthActivities}
+                activityTypes={activityTypes}
+                onDateClick={handleDateClick}
+                onRemoveActivity={handleRemoveActivity}
+              />
+            </div>
+
+            {/* Sidebar with Stats */}
+            <div className="space-y-4">
+              <ActivityStats activities={monthActivities} activityTypes={activityTypes} />
+              
+              {/* Quick Tips */}
+              <div className="rounded-lg border border-border bg-card p-4">
+                <h3 className="text-sm font-medium text-foreground mb-2">Suggerimenti</h3>
+                <ul className="text-xs text-muted-foreground space-y-2">
+                  <li>Clicca su un giorno per aggiungere un&apos;attività</li>
+                  <li>Passa il mouse su un&apos;attività per rimuoverla</li>
+                  <li>Usa il pulsante Gestisci per personalizzare le tipologie</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <AddActivityDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        selectedDate={selectedDate}
+        onAddActivity={handleAddActivity}
+        activityTypes={activityTypes}
+      />
+
+      <ManageTypesDialog
+        open={typesDialogOpen}
+        onOpenChange={setTypesDialogOpen}
+        activityTypes={activityTypes}
+        onUpdateTypes={handleUpdateTypes}
+      />
+    </div>
+  )
+}
