@@ -10,11 +10,11 @@ import { AddActivityDialog } from "./add-activity-dialog";
 import { ManageTypesDialog } from "./manage-types-dialog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Settings2, Loader2, Calendar, CalendarDays, CalendarRange } from "lucide-react"
+import { Settings2, Loader2, Calendar, CalendarDays, CalendarRange } from "lucide-react";
 
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-type ViewMode = "monthly" | "weekly" | "daily"
+type ViewMode = "monthly" | "weekly" | "daily";
 
 interface MonthlyCalendarProps {
 	viewMode: ViewMode;
@@ -112,7 +112,7 @@ export function MonthlyCalendar({ viewMode, setViewMode }: MonthlyCalendarProps)
 				{/* Header */}
 				<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 					<div>
-						<h1 className="text-2xl font-bold text-foreground">Calendario Attività</h1>
+						<h1 className="text-2xl font-bold text-foreground">Agenda Acquachiara</h1>
 						<p className="text-sm text-muted-foreground">Gestisci e monitora le tue attività mensili</p>
 					</div>
 					{/* Activity Type Legend with Settings */}

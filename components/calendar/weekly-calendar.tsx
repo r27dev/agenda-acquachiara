@@ -14,7 +14,7 @@ import { Settings2, Loader2, Calendar, CalendarDays, CalendarRange } from "lucid
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-type ViewMode = "monthly" | "weekly" | "daily"
+type ViewMode = "monthly" | "weekly" | "daily";
 
 interface WeeklyCalendarProps {
 	viewMode: ViewMode;
@@ -145,7 +145,7 @@ export function WeeklyCalendar({ viewMode, setViewMode }: WeeklyCalendarProps) {
 				{/* Header */}
 				<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 					<div>
-						<h1 className="text-2xl font-bold text-foreground">Calendario Attività</h1>
+						<h1 className="text-2xl font-bold text-foreground">Agenda Acquachiara</h1>
 						<p className="text-sm text-muted-foreground">Gestisci e monitora le tue attività settimanali</p>
 					</div>
 					{/* Activity Type Legend with Settings */}

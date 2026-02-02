@@ -26,8 +26,8 @@ CREATE INDEX idx_activities_date ON activities(date);
 
 -- Inserisci tipologie predefinite se non esistono
 INSERT IGNORE INTO activity_types (id, name, color) VALUES
-  ('type-meeting', 'Riunione', 'blue'),
-  ('type-task', 'Compito', 'yellow'),
-  ('type-deadline', 'Scadenza', 'red'),
-  ('type-event', 'Evento', 'green'),
-  ('type-reminder', 'Promemoria', 'pink');
+  ('type-1', 'Task 1', 'blue'),
+  ('type-2', 'Task 2', 'yellow'),
+  ('type-3', 'Task 3', 'red'),
+  ('type-4', 'Task 4', 'green'),
+  ('type-5', 'Task 5', 'pink');
